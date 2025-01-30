@@ -68,11 +68,9 @@ rule grn:
         adj = "adj_{id}.csv"
     params:
         tfs = config['tfs']
-    #conda:
-    #    conda_env
     shell:
         """
-        source activate /gpfs/data/abl/home/haoy04/miniconda3/envs/pyscenic;
+        source activate conda_env;
         pyscenic grn {input.loom} {params.tfs} -o {output.adj} --method grnboost2 --num_workers 20 --seed 123
         """
 
@@ -88,11 +86,9 @@ rule ctx:
         annotations = db_files["motif_annotations"]
     output:
         reg = "reg_{id}.csv"
-    #conda:
-    #    conda_env
     shell:
         """
-        source activate /gpfs/data/abl/home/haoy04/miniconda3/envs/pyscenic;
+        source activate conda_env;
         pyscenic ctx {input.adj} {input.scores_10kbp} {input.rankings_10kbp} \
         {input.scores_500bp} {input.rankings_500bp} \
         --annotations_fname {input.annotations} \
@@ -107,11 +103,9 @@ rule aucell:
         reg = "reg_{id}.csv"
     output:
         auc = "aucell_out_{id}.loom"
-    #conda:
-    #    conda_env
     shell:
         """
-        source activate /gpfs/data/abl/home/haoy04/miniconda3/envs/pyscenic;
+        source activate conda_env;
         pyscenic aucell {input.loom} {input.reg} --output {output.auc} \
         --num_workers 20 --auc_threshold 0.05
         """

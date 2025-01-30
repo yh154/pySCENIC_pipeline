@@ -1,0 +1,9 @@
+
+samples: "sample.csv"
+species: "mouse" # or human
+loom_dir: "SCENIC/"
+tfs: "allTFs_mm.txt"
+#dbdir: "/gpfs/data/abl/home/haoy04/Kwok/Angeliki_cross-species_Dec24/SCENIC/cisTarget_databases"
+dbdir: "/Users/yuanhao/Analysis/Kwok/Angeliki_cross-species_Dec24/SCENIC/cisTarget_databases"
+#conda_env: "/gpfs/data/abl/home/haoy04/miniconda3/envs/pyscenic"
+conda_env: "/Users/yuanhao/mambaforge/envs/pyscenic"

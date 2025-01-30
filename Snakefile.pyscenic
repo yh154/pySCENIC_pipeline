@@ -1,0 +1,117 @@
+__author__ = "YuanH"
+__email__ = "yuanh.ny@gmail.com"
+
+"""
+A workflow using pySCENIC
+"""
+import pandas as pd
+
+configfile: "config.pyscenic.yaml"
+
+onsuccess:
+    print("Workflow finished, no error")
+
+onerror:
+    print("An error occurred")
+
+try:
+    SAMPLES = pd.read_csv(config["samples"]).set_index("sample", drop=False)
+except:
+    SAMPLES = pd.read_table(config["samples"]).set_index("sample", drop=False)
+else:
+    print("There is an error with sample file.")
+
+IDS = SAMPLES['sample']
+
+# Define the conda environment to use
+conda_env = config['conda_env']
+
+def get_input(wildcards):
+    loom=SAMPLES.loc[wildcards.id, ["loom"]].dropna(how="all")
+    in_dir=config['loom_dir']
+    if(not in_dir or in_dir == './' ):
+        return loom
+    else:
+        return [in_dir+r for r in loom]
+
+
+# Define paths to databases
+dbdir = config['dbdir']
+species = config['species']
+if species.lower() == 'mouse':
+    db_files = {
+        "10kbp_scores": dbdir+"/mm10_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather",
+        "10kbp_rankings": dbdir+"/mm10_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
+        "500bp_scores": dbdir+"/mm10_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather",
+        "500bp_rankings": dbdir+"/mm10_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
+        "motif_annotations": dbdir+"/motifs-v10nr_clust-nr.mgi-m0.001-o0.0.tbl"
+    }
+else:
+    db_files = {
+        "10kbp_scores": dbdir+"/hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather",
+        "10kbp_rankings": dbdir+"/hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
+        "500bp_scores": dbdir+"/hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.scores.feather",
+        "500bp_rankings": dbdir+"/hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather",
+        "motif_annotations": dbdir+"/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl"
+}
+
+# Default rule to run the entire pipeline
+rule all:
+    input:
+        expand("aucell_out_{id}.loom", id=IDS)
+
+# Rule for Step 1: Run GRNBoost2 to infer gene regulatory networks
+rule grn:
+    input:
+        loom = get_input
+    output:
+        adj = "adj_{id}.csv"
+    params:
+        tfs = config['tfs']
+    #conda:
+    #    conda_env
+    shell:
+        """
+        source activate /gpfs/data/abl/home/haoy04/miniconda3/envs/pyscenic;
+        pyscenic grn {input.loom} {params.tfs} -o {output.adj} --method grnboost2 --num_workers 20 --seed 123
+        """
+
+# Rule for Step 2 & 3: Run ctx to identify regulons
+rule ctx:
+    input:
+        adj = "adj_{id}.csv",
+        loom = get_input,
+        scores_10kbp = db_files["10kbp_scores"],
+        rankings_10kbp = db_files["10kbp_rankings"],
+        scores_500bp = db_files["500bp_scores"],
+        rankings_500bp = db_files["500bp_rankings"],
+        annotations = db_files["motif_annotations"]
+    output:
+        reg = "reg_{id}.csv"
+    #conda:
+    #    conda_env
+    shell:
+        """
+        source activate /gpfs/data/abl/home/haoy04/miniconda3/envs/pyscenic;
+        pyscenic ctx {input.adj} {input.scores_10kbp} {input.rankings_10kbp} \
+        {input.scores_500bp} {input.rankings_500bp} \
+        --annotations_fname {input.annotations} \
+        --expression_mtx_fname {input.loom} --output {output.reg} \
+        --mask_dropouts --num_workers 20
+        """
+
+# Rule for Step 4: Run AUCell to calculate regulon activity
+rule aucell:
+    input:
+        loom = get_input,
+        reg = "reg_{id}.csv"
+    output:
+        auc = "aucell_out_{id}.loom"
+    #conda:
+    #    conda_env
+    shell:
+        """
+        source activate /gpfs/data/abl/home/haoy04/miniconda3/envs/pyscenic;
+        pyscenic aucell {input.loom} {input.reg} --output {output.auc} \
+        --num_workers 20 --auc_threshold 0.05
+        """

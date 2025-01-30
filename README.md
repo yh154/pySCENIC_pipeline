@@ -2,7 +2,7 @@
 
 ### input:
     "sample.csv" - sample sheet with sample ids and correspoinding loom file, "sample" and "loom". 
-    "config.yaml" - all running parameters. 
+    "config.pyscenic.yaml" - all running parameters. 
     "cisTarget_databases" - target databaees can be downloaded from SCENIC website (https://resources.aertslab.org/cistarget/) 
     "tfs" - all TFs
 ### Run:
